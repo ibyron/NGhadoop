@@ -1,0 +1,134 @@
+---
+- hosts: all
+  user: root
+  vars:
+    okeanos_url: 'https://accounts.okeanos.grnet.gr/identity/v2.0'
+    my_token: ''
+    vm_image_id: '78e96a57-2436-45c8-96b5-5eda9eb69be9'
+    vm_flavor_id_big: 289
+    vm_flavor_id_small: 243
+    size: 1
+    prefix: 'ng'
+    create_hadoop_cluster: True
+
+  tasks:
+  - name: download source code from git
+    tags: gitpull
+    delegate_to: 127.0.0.1
+    local_action: command git clone https://github.com/ibyron/hadoop.git
+    when: create_hadoop_cluster
+
+  - name: create hadoop cluster step 1 (master)
+    tags: cluster1
+    delegate_to: 127.0.0.1
+    local_action: command python hadoop_cluster_vnat.py --clustersize=1 --flavor-id='{{ vm_flavor_id_big }}' --image-id='{{ vm_image_id }}' --token='{{ my_token }}' --prefix='{{ prefix }}' chdir=./hadoop
+    when: create_hadoop_cluster
+
+  - name: create hadoop cluster step 2 (slaves)
+    tags: cluster2
+    delegate_to: 127.0.0.1
+    local_action: command python hadoop_cluster_vnat.py --clustersize={{ size }} --flavor-id='{{ vm_flavor_id_small }}' --image-id='{{ vm_image_id }}' --token='{{ my_token }}' --prefix='{{ prefix }}' --extend chdir=./hadoop
+    when: create_hadoop_cluster
+
+  - name:  get master ip
+    tags: getip
+    delegate_to: 127.0.0.1
+    local_action: shell /bin/sh -c 'head -2 hadoop/hosts | tail -1'
+    register: result 
+
+  - name: add host
+    tags: addhost
+    add_host: name={{ result["stdout"] }} groups=hadoopgroup
+
+- hosts: hadoopgroup
+  user: root
+
+  tasks:
+  - name: install software
+    tags: apt0
+    action: apt name={{ item }} state=latest install_recommends=no 
+    with_items:
+      - python-dev
+      - libxml2-dev
+      - libxslt1-dev
+      - python-pip
+      - gcc
+      - unzip
+      - bzip2
+
+  - name: install lxml
+    tags: lxml
+    action: command pip install lxml
+
+- hosts: hadoopgroup
+  user: hduser
+  vars:
+    stanford_corenlp_ver: stanford-corenlp-full-2014-01-04
+    from_n: 2
+    to_n: 3
+    threshold: 2
+    
+  tasks:
+  - name: format hadoop cluster
+    tags: hformat
+    action: shell /bin/sh -c 'yes | /usr/local/hadoop/bin/hadoop namenode -format'
+    when: create_hadoop_cluster
+
+  - name: start hadoop cluster
+    tags: hstart
+    action: shell /usr/local/hadoop/bin/start-all.sh
+    when: create_hadoop_cluster
+
+  - name: create HDFS dirs
+    tags: hmkdir
+    action: shell /bin/sh -c 'export PATH=$PATH:/usr/local/hadoop/bin; hadoop fs -mkdir wiki; hadoop fs -mkdir wiki/in'
+    when: create_hadoop_cluster
+
+  - name: download and unzip Stanford OpenNLP
+    tags: stanNLP
+    action: shell /bin/sh -c 'wget http://nlp.stanford.edu/software/{{ stanford_corenlp_ver }}.zip; unzip {{ stanford_corenlp_ver }}.zip'
+
+  - name: download wikipedia dump
+    tags: dump
+    action: shell wget http://dumps.wikimedia.org/elwiki/latest/elwiki-latest-pages-meta-current.xml.bz2
+
+  - name: copy wikiExtractor source
+    tags: copywikiX
+    action: copy src=wikiExtractor.py dest=~hduser
+
+  - name: download and extract text from wikipedia dump
+    tags: wikiX
+    action: shell /bin/sh -c 'bzcat elwiki-latest-pages-meta-current.xml.bz2 | python wikiExtractor.py -b 16M -o wikiX'
+
+  - name: copy create filelist script
+    tags: copycreateflist
+    action: copy src=create_filelist.py dest=~hduser owner=hduser group=hadoop
+
+  - name: create filelist
+    tags: createflist
+    action: shell /bin/sh -c 'python create_filelist.py ~/wikiX > {{ stanford_corenlp_ver }}/filelist'
+
+  - name: copy tokenization script
+    tags: copytokscript
+    action: copy src=stanford-script.sh dest=~hduser/{{ stanford_corenlp_ver }} mode=744
+
+  - name: copy xml script
+    tags: copyxmlscript
+    action: copy src=xml2text.py dest=~hduser/{{ stanford-corenlp_ver }}
+
+  - name: run sentence splitting and tokenization
+    tags: tokenize
+    action: shell /bin/sh -c 'cd {{ stanford_corenlp_ver }}; ./stanford-script.sh'
+
+  - name: put files to HDFS
+    tags: copyHDFS
+    action: shell /bin/sh -c 'export PATH=$PATH:/usr/local/hadoop/bin; hadoop fs -rm /user/hduser/wiki/in/*; hadoop fs -put ~/{{ stanford_corenlp_ver }}/wiki_*ss wiki/in'
+
+  - name: copy imcrun.py script & dirs
+    tags: copyimcrun
+    action: copy src=MRcode dest=~hduser/ owner=hduser group=hadoop mode=0600
+
+  - name: run Hadoop n-gram wordcount
+    tags: MRrun
+    action: shell /bin/sh -c 'export PATH=$PATH:/usr/local/hadoop/bin; python imcrun.py --from={{ from_n}} --to={{ to_n }} --threshold={{ threshold }}' chdir=./MRcode
+
