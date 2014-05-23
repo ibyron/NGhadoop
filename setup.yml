@@ -15,7 +15,7 @@
   - name: download source code from git
     tags: gitpull
     delegate_to: 127.0.0.1
-    local_action: command git clone https://github.com/ibyron/hadoop.git
+    local_action: shell /bin/sh -c 'rm -rf hadoop; git clone https://github.com/ibyron/hadoop.git'
     when: create_hadoop_cluster
 
   - name: create hadoop cluster step 1 (master)
@@ -31,7 +31,7 @@
     when: create_hadoop_cluster
 
   - name:  get master ip
-    tags: getip
+    tags: getip from hadoop/hosts
     delegate_to: 127.0.0.1
     local_action: shell /bin/sh -c 'head -2 hadoop/hosts | tail -1'
     register: result 
@@ -44,7 +44,7 @@
   user: root
 
   tasks:
-  - name: install software
+  - name: install software on master
     tags: apt0
     action: apt name={{ item }} state=latest install_recommends=no 
     with_items:
@@ -56,7 +56,7 @@
       - unzip
       - bzip2
 
-  - name: install lxml
+  - name: install lxml on master
     tags: lxml
     action: command pip install lxml
 
@@ -64,33 +64,36 @@
   user: hduser
   vars:
     stanford_corenlp_ver: stanford-corenlp-full-2014-01-04
+    language: el
+    wikidump: elwiki-latest-pages-meta-current.xml.bz2
     from_n: 2
     to_n: 3
     threshold: 2
+    start_hadoop_cluster: True
     
   tasks:
   - name: format hadoop cluster
     tags: hformat
     action: shell /bin/sh -c 'yes | /usr/local/hadoop/bin/hadoop namenode -format'
-    when: create_hadoop_cluster
+    when: start_hadoop_cluster
 
   - name: start hadoop cluster
     tags: hstart
     action: shell /usr/local/hadoop/bin/start-all.sh
-    when: create_hadoop_cluster
+    when: start_hadoop_cluster
 
   - name: create HDFS dirs
     tags: hmkdir
     action: shell /bin/sh -c 'export PATH=$PATH:/usr/local/hadoop/bin; hadoop fs -mkdir wiki; hadoop fs -mkdir wiki/in'
-    when: create_hadoop_cluster
+    when: start_hadoop_cluster
 
   - name: download and unzip Stanford OpenNLP
     tags: stanNLP
-    action: shell /bin/sh -c 'wget http://nlp.stanford.edu/software/{{ stanford_corenlp_ver }}.zip; unzip {{ stanford_corenlp_ver }}.zip'
+    action: shell /bin/sh -c 'wget http://nlp.stanford.edu/software/{{ stanford_corenlp_ver }}.zip; unzip {{ stanford_corenlp_ver }}.zip; rm -f unzip {{ stanford_corenlp_ver }}.zip'
 
   - name: download wikipedia dump
     tags: dump
-    action: shell wget http://dumps.wikimedia.org/elwiki/latest/elwiki-latest-pages-meta-current.xml.bz2
+    action: shell wget http://dumps.wikimedia.org/{{ language }}wiki/latest/{{ wikidump }}
 
   - name: copy wikiExtractor source
     tags: copywikiX
@@ -98,7 +101,7 @@
 
   - name: download and extract text from wikipedia dump
     tags: wikiX
-    action: shell /bin/sh -c 'bzcat elwiki-latest-pages-meta-current.xml.bz2 | python wikiExtractor.py -b 16M -o wikiX'
+    action: shell /bin/sh -c 'bzcat {{ wikidump }} | python wikiExtractor.py -b 16M -o wikiX; rm -f {{ wikidump }}'
 
   - name: copy create filelist script
     tags: copycreateflist
@@ -114,7 +117,7 @@
 
   - name: copy xml script
     tags: copyxmlscript
-    action: copy src=xml2text.py dest=~hduser/{{ stanford-corenlp_ver }}
+    action: copy src=xml2text.py dest=~hduser/{{ stanford_corenlp_ver }}
 
   - name: run sentence splitting and tokenization
     tags: tokenize
