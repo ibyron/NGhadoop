@@ -92,7 +92,7 @@ discardElements = set([
         'table', 'tr', 'td', 'th', 'caption',
         'form', 'input', 'select', 'option', 'textarea',
         'ul', 'li', 'ol', 'dl', 'dt', 'dd', 'menu', 'dir',
-        'ref', 'references', 'img', 'imagemap', 'source', 'style',
+        'ref', 'references', 'img', 'imagemap', 'source', 'style', 
         ])
 
 #=========================================================================
@@ -140,7 +140,7 @@ ignoredTags = [
         'b', 'big', 'blockquote', 'center', 'cite', 'div', 'em',
         'font', 'h1', 'h2', 'h3', 'h4', 'hiero', 'i', 'kbd', 'nowiki',
         'p', 'plaintext', 's', 'small', 'span', 'strike', 'strong',
-        'sub', 'sup', 'tt', 'u', 'var',
+        'sub', 'sup', 'tt', 'u', 'var', 
 ]
 
 placeholder_tags = {'math':'formula', 'code':'codice'}
@@ -439,10 +439,14 @@ def clean(text):
     text = text.replace('\t', ' ')
     text = spaces.sub(' ', text)
     text = dots.sub('...', text)
+    text = re.sub(r'text-align: ?(center|right|left);( color:black)?', r'', text)
+    text = re.sub(r'style=\" ?background(\-color)?: ?#([a-zA-Z0-9]){6}\"?', r'', text)
+    text = re.sub(r'align=\"?(left|right|center)\"?', r'', text)
+    text = re.sub(r'(colspan|cellpadding|rowspan)=\"?[0-9]+\"?', r'', text)
     text = re.sub(u' (,:\.\)\]»)', r'\1', text)
     text = re.sub(u'(\[\(«) ', r'\1', text)
+    text = text.replace(',,', ',').replace(',.', '.').replace('\"\"', '\"')
     text = re.sub(r'\n\W+?\n', '\n', text) # lines with only punctuations
-    text = text.replace(',,', ',').replace(',.', '.')
     return text
 
 section = re.compile(r'(==+)\s*(.*?)\s*\1')
