@@ -65,7 +65,7 @@
   vars:
     stanford_corenlp_ver: stanford-corenlp-full-2014-01-04
     language: el
-    wikidump: elwiki-latest-pages-meta-current.xml.bz2
+    wikidump: wiki-latest-pages-meta-current.xml.bz2
     from_n: 2
     to_n: 3
     threshold: 2
@@ -93,39 +93,27 @@
 
   - name: download wikipedia dump
     tags: dump
-    action: shell wget http://dumps.wikimedia.org/{{ language }}wiki/latest/{{ wikidump }}
+    action: shell wget http://dumps.wikimedia.org/{{ language }}wiki/latest/{{ language }}{{ wikidump }}
 
   - name: copy wikiExtractor source
     tags: copywikiX
     action: copy src=wikiExtractor.py dest=~hduser
 
-  - name: download and extract text from wikipedia dump
+  - name: extract text from wikipedia XML dump (and remove the original dump)
     tags: wikiX
-    action: shell /bin/sh -c 'bzcat {{ wikidump }} | python wikiExtractor.py -b 16M -o wikiX; rm -f {{ wikidump }}'
-
-  - name: copy create filelist script
-    tags: copycreateflist
-    action: copy src=create_filelist.py dest=~hduser owner=hduser group=hadoop
-
-  - name: create filelist
-    tags: createflist
-    action: shell /bin/sh -c 'python create_filelist.py ~/wikiX > {{ stanford_corenlp_ver }}/filelist'
+    action: shell /bin/sh -c 'bzcat {{ language}}{{ wikidump }} | python wikiExtractor.py -b 16M -o wikiX; rm -f {{ language }}{{ wikidump }}'
 
   - name: copy tokenization script
     tags: copytokscript
-    action: copy src=stanford-script.sh dest=~hduser/{{ stanford_corenlp_ver }} mode=744
+    action: copy src=create_filelist.py dest=~hduser owner=hduser group=hadoop
 
-  - name: copy xml script
-    tags: copyxmlscript
-    action: copy src=xml2text.py dest=~hduser/{{ stanford_corenlp_ver }}
-
-  - name: run sentence splitting and tokenization
+  - name: run tokenization
     tags: tokenize
-    action: shell /bin/sh -c 'cd {{ stanford_corenlp_ver }}; ./stanford-script.sh'
+    action: shell /bin/sh -c 'python create_filelist.py ~/wikiX'
 
   - name: put files to HDFS
     tags: copyHDFS
-    action: shell /bin/sh -c 'export PATH=$PATH:/usr/local/hadoop/bin; hadoop fs -rm /user/hduser/wiki/in/*; hadoop fs -put ~/{{ stanford_corenlp_ver }}/wiki_*ss wiki/in'
+    action: shell /bin/sh -c 'export PATH=$PATH:/usr/local/hadoop/bin; hadoop fs -rm /user/hduser/wiki/in/*; hadoop fs -put ~/{{ stanford_corenlp_ver }}/TOK/*tok wiki/in'
 
   - name: copy imcrun.py script & dirs
     tags: copyimcrun
