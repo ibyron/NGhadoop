@@ -92,9 +92,10 @@ Text, Text, IntWritable> {
 	private IntWritable intCount = new IntWritable();
 	private Map<String, Integer> wordMap;
         private String pad;
-	private int wordMapSz = 0;
-        private final short IMC_n_thres = 35;
+	private int wordMapSz = 0;			// size of wordMap
+        private final short IMC_n_thres = 35;		// after this value for n don't perform in-memory combine
 	private final static IntWritable one = new IntWritable(1);
+        private StringBuilder removedAcc = new StringBuilder();	// contains key value without accents (for Greek)
 
 	@Override
 	protected void setup(Context context) throws IOException,
@@ -132,17 +133,18 @@ Text, Text, IntWritable> {
 						gramBuilder.append(tokens[k]);
 						gramBuilder.append(" ");
 					}
+                                        removeAccent(gramBuilder);
 			                if (gram_length_from > IMC_n_thres) {
-						this.word.set(gramBuilder.toString());
+						this.word.set(removedAcc.toString());
 						context.write(this.word, one);
 					}
 					else {
-						Integer count = wordMap.get(gramBuilder.toString());
+						Integer count = wordMap.get(removedAcc.toString());
 						if (count == null) {
-							wordMap.put(gramBuilder.toString(), 1);
-							wordMapSz = wordMapSz + (gramBuilder.toString().length()+5);
+							wordMap.put(removedAcc.toString(), 1);
+							wordMapSz = wordMapSz + (removedAcc.toString().length()+5);
 						} else {
-							wordMap.put(gramBuilder.toString(), count+1);
+							wordMap.put(removedAcc.toString(), count+1);
 						}
 					}
 	
@@ -169,6 +171,24 @@ Text, Text, IntWritable> {
 			context.write(this.word, intCount);
 		}
 		this.wordMap.clear();
+	}
+
+	private void removeAccent(StringBuilder word)
+        {
+		removedAcc.setLength(0);
+        	for (int i=0; i<word.length(); i++) {
+			if (word.charAt(i) == 'ά') removedAcc.append('α');
+			else if (word.charAt(i) == 'έ') removedAcc.append('ε');
+			else if (word.charAt(i) == 'ή') removedAcc.append('η');
+			else if (word.charAt(i) == 'ί') removedAcc.append('ι');
+			else if (word.charAt(i) == 'ό') removedAcc.append('ο');
+			else if (word.charAt(i) == 'ύ') removedAcc.append('υ');
+			else if (word.charAt(i) == 'ώ') removedAcc.append('ω');
+			else if (word.charAt(i) == 'ΐ') removedAcc.append('ι');
+                        else if (word.charAt(i) == 'ΰ') removedAcc.append('υ');
+ 			else removedAcc.append(word.charAt(i));
+		}
+                return;   
 	}
 }
 
