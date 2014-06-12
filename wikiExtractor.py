@@ -546,7 +546,7 @@ class OutputSplitter:
         dir_name = self.dir_name()
         if not os.path.isdir(dir_name):
             os.makedirs(dir_name)
-        file_name = os.path.join(dir_name, self.file_name())
+        file_name = os.path.join(dir_name, os.path.basename(self.dir_name())+'_'+self.file_name())	# prefix each filename with dir_name, thus make each filename unique
         if self.compress:
             return bz2.BZ2File(file_name + '.bz2', 'w')
         else:
