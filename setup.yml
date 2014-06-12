@@ -49,16 +49,11 @@
     action: apt name={{ item }} state=latest install_recommends=no 
     with_items:
       - python-dev
-      - libxml2-dev
-      - libxslt1-dev
-      - python-pip
-      - gcc
+#      - libxml2-dev
+#      - libxslt1-dev
+#      - python-pip
       - unzip
       - bzip2
-
-  - name: install lxml on master
-    tags: lxml
-    action: command pip install lxml
 
 - hosts: hadoopgroup
   user: hduser
@@ -116,7 +111,7 @@
     action: shell /bin/sh -c 'export PATH=$PATH:/usr/local/hadoop/bin; hadoop fs -rm /user/hduser/wiki/in/*; hadoop fs -put ~/{{ stanford_corenlp_ver }}/TOK/*tok wiki/in'
 
   - name: copy imcrun.py script & dirs
-    tags: copyimcrun
+    tags: copyMRrun
     action: copy src=MRcode dest=~hduser/ owner=hduser group=hadoop mode=0600
 
   - name: run Hadoop n-gram wordcount
