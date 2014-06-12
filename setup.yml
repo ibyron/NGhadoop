@@ -49,9 +49,6 @@
     action: apt name={{ item }} state=latest install_recommends=no 
     with_items:
       - python-dev
-#      - libxml2-dev
-#      - libxslt1-dev
-#      - python-pip
       - unzip
       - bzip2
 
@@ -96,7 +93,7 @@
 
   - name: extract text from wikipedia XML dump (and remove the original dump)
     tags: wikiX
-    action: shell /bin/sh -c 'bzcat {{ language}}{{ wikidump }} | python wikiExtractor.py -b 16M -o wikiX; rm -f {{ language }}{{ wikidump }}'
+    action: shell /bin/sh -c 'rm -rf wikiX; bzcat {{ language}}{{ wikidump }} | python wikiExtractor.py -b 16M -o wikiX; rm -f {{ language }}{{ wikidump }}'
 
   - name: copy tokenization script
     tags: copytokscript
