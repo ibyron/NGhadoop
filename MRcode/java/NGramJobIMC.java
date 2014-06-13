@@ -37,7 +37,7 @@ public class NGramJobIMC implements Tool
 
 	public static void main(String[] args) throws Exception {
 		if(args.length < 3) {
-			System.err.println("Usage: ngram <input> <output> <number_of_grams_from> <number_of_grams_to>");
+			System.err.println("Usage: ngram <input> <output> <number_of_grams_from> <number_of_grams_to> <num_reducers>");
 			System.exit(1);
 		}
 
@@ -50,16 +50,19 @@ public class NGramJobIMC implements Tool
 
 
 public int run(String[] args) throws Exception {
+	String jobTitle = new String();
 	conf.setInt(GRAM_LENGTH_FROM, Integer.parseInt(args[2]));
 	if (args.length == 4) { 
 		conf.setInt(GRAM_LENGTH_TO, Integer.parseInt(args[3])); 
+		jobTitle = "NGram"+args[2]+"-"+args[3];
 	}
         else {
 		conf.setInt(GRAM_LENGTH_TO, Integer.parseInt(args[2]));
+		jobTitle = "NGram"+args[2];
 	}
 	conf.set("mapred.textoutputformat.separator", "\t");
 	conf.set("mapred.child.java.opts", "-Xmx768m");
-	Job job = new Job(conf, "NGrams");
+	Job job = new Job(conf, jobTitle);
         job.setJarByClass(NGramJobIMC.class);
 	job.setInputFormatClass(TextInputFormat.class);
 	job.setOutputFormatClass(TextOutputFormat.class);
@@ -67,6 +70,8 @@ public int run(String[] args) throws Exception {
 	job.setCombinerClass(NGramJobIMC.IntSumReducer.class);
 	job.setReducerClass(NGramJobIMC.IntSumReducer.class);
         job.setNumReduceTasks(30);
+        if (args.length == 5) 
+		 job.setNumReduceTasks(Integer.parseInt(args[4]));
  	job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(IntWritable.class);
 	job.setJarByClass(NGramJobIMC.class);
