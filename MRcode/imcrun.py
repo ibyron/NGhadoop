@@ -89,7 +89,7 @@ def main():
 
     # create and run the Hadoop job. This single job calculates *all* n-grams for multiple values of n (from...to) by prefixing the 'n' value before the key
     n = opts.start
-    run = "hadoop fs -rmr /user/hduser/wiki/ngram"+str(n)+"; hadoop jar java/NGramJobIMC.jar NGramJobIMC "+opts.inputdir+"  /user/hduser/wiki/ngram"+str(n)+" "+str(opts.start)+" "+str(opts.to)
+    run = "hadoop fs -rmr /user/hduser/wiki/ngram"+str(n)+"; hadoop jar java/NGramJobIMC.jar NGramJobIMC "+opts.inputdir+"  /user/hduser/wiki/ngram"+str(n)+" "+str(opts.start)+" "+str(opts.to)+" "+str(opts.reduce)
     print run
     result = os.system(run)
     print "Hadoop result =", result
